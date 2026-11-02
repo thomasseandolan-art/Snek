@@ -22,7 +22,7 @@ falling_object = pygame.transform.scale(falling_object, (50, 50))
 falling_object_x = 300
 falling_object_y = 0
 falling_object_vel_x = 0
-falling_object_vel_y = 0.3
+falling_object_vel_y = 180
 def collision_detection():
     return (player_x <= (falling_object_x + int(falling_object.get_width())) and
     (player_x + player.get_width()) >= falling_object_x and
@@ -32,6 +32,7 @@ def collision_detection():
 game_state = 1
 lives = 3
 score = 0
+falling_object_vel_y = 180
 high_score_path = Path(__file__).with_name("high_score.txt")
 
 try:
@@ -53,7 +54,7 @@ ui_font = pygame.font.Font(None, 32)
 restart_button = pygame.Rect(290, 335, 220, 60)
 coin_image = falling_object
 bomb_image = pygame.image.load("imgs/1.png").convert_alpha()
-bomb_image = pygame.transform.scale(bomb_image, (100, 100))
+bomb_image = pygame.transform.scale(bomb_image, (150, 150))
 
 def new_drop():
     bomb = random.random() < 0.2
@@ -65,11 +66,17 @@ def new_drop():
     return image, bomb, x, 0
 
 falling_object, is_bomb, falling_object_x, falling_object_y = new_drop()
+clock = pygame.time.Clock()
+paused = False
 while True:
+    dt = clock.tick(60) / 1000
     #take input
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
                  quit(0)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_p and game_state == 1:
+                paused = not paused
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1 and game_state == 2:
                 if restart_button.collidepoint(event.pos):
@@ -81,31 +88,23 @@ while True:
                     player_vel_y = 0
                     falling_object, is_bomb, falling_object_x, falling_object_y = new_drop()
                     game_state = 1
-
-
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                player_vel_x = -0.3
-            if event.key == pygame.K_RIGHT:
-                player_vel_x = 0.3
-            if event.key == pygame.K_UP:
-                player_vel_y = -0.3
-            if event.key == pygame.K_DOWN:
-                player_vel_y = 0.3
-        if event.type == pygame.KEYUP:
-            if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
-                player_vel_x = 0
-            if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
-                player_vel_y = 0
-    if game_state == 1:
-        falling_object_x += falling_object_vel_x
-        falling_object_y += falling_object_vel_y
+        keys = pygame.key.get_pressed()
+        player_vel_x = (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]) * 240
+        player_vel_y = (keys[pygame.K_DOWN] - keys[pygame.K_UP]) * 240
+    if game_state == 1 and not paused:
+        falling_object_x += falling_object_vel_x * dt
+        if is_bomb:
+            falling_object_y += falling_object_vel_y * 2 * dt
+        else:
+            falling_object_y += falling_object_vel_y * dt
 
         if collision_detection():
             if is_bomb:
                 lives -= 1
+                falling_object_vel_y = 180
             else:
                 score += 1
+                falling_object_vel_y = min(falling_object_vel_y + 5, 300)
                 if score > high_score:
                     high_score = score
                     with open(high_score_path, "w") as file:
@@ -116,6 +115,7 @@ while True:
         elif falling_object_y >= 600:
             if not is_bomb:
                 lives -= 1
+                falling_object_vel_y = 180
 
             falling_object, is_bomb, falling_object_x, falling_object_y = new_drop()
 
@@ -130,9 +130,9 @@ while True:
     for y in range(0, 600, 50):
         for x in range(0, 800, 50):
             window.blit(grass, (x, y))
-    if game_state == 1:
-        player_x += player_vel_x
-        player_y += player_vel_y
+    if game_state == 1 and not paused:
+        player_x += player_vel_x * dt
+        player_y += player_vel_y * dt
     if player_x < 0:
         player_x = 0
     if player_x > window.get_width() - player.get_width():
@@ -161,9 +161,16 @@ while True:
         window.blit(title, title.get_rect(center=(400, 225)))
         window.blit(message, message.get_rect(center=(400, 285)))
 
-        pygame.draw.rect(window, (65, 150, 85), restart_button)
+        if restart_button.collidepoint(pygame.mouse.get_pos()):
+            button_color = (85, 185, 105)
+        else:
+            button_color = (65, 150, 85)
+        pygame.draw.rect(window, button_color, restart_button)
         label = ui_font.render("Play Again", True, (255, 255, 255))
         window.blit(label, label.get_rect(center=restart_button.center))
+    if paused:
+        pause_text = title_font.render("Paused - P to resume", True, (255, 255, 255))
+        window.blit(pause_text, pause_text.get_rect(center=(400, 300)))
 
     pygame.display.flip()
 
